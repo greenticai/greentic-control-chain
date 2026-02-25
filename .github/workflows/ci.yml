@@ -7,8 +7,6 @@ on:
     branches:
       - main
       - master
-    tags:
-      - "v*"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -38,7 +36,7 @@ jobs:
         run: cargo test --all-features
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [lint, test]
     runs-on: ubuntu-latest
     permissions:
@@ -48,20 +46,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Validate tag matches Cargo.toml version
+      - name: Read version from Cargo.toml
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
           version="$(awk -F '"' '/^version = "/ { print $2; exit }' Cargo.toml)"
           if [ -z "$version" ]; then
             echo "Failed to extract crate version from Cargo.toml" >&2
-            exit 1
-          fi
-          expected_tag="v${version}"
-          if [ "${tag}" != "${expected_tag}" ]; then
-            echo "Tag/version mismatch: got '${tag}', expected '${expected_tag}'" >&2
             exit 1
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"

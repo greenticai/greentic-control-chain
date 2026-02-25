@@ -81,8 +81,8 @@ The stack is Rust (edition 2024), shell scripts for local checks/build, and GitH
 - **Role:** Pull request and push validation pipeline.
 - **Key functionality:**
   - Parallel jobs for linting and tests.
-  - Tag-gated publish job (`v*`) that runs after lint/test pass.
-  - Publish job verifies tag/version match, publishes crates, and pushes `.gtpack` artifacts to GHCR.
+  - Master-branch publish job that runs after lint/test pass.
+  - Publish job reads version from `Cargo.toml`, publishes crates, and pushes `.gtpack` artifacts to GHCR.
   - Uses Rust toolchain setup and Cargo caching.
 - **Key dependencies / integration points:**
   - Reuses local CI expectations from scripts under `ci/`.

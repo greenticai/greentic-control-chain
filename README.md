@@ -71,23 +71,19 @@ cargo run --bin ingress_control_handle
 ### GitHub Actions
 
 - `.github/workflows/ci.yml`
-  - Runs on pull requests, branch pushes (`main`/`master`), tag pushes (`v*`), and `workflow_dispatch`.
+  - Runs on pull requests, branch pushes (`main`/`master`), and `workflow_dispatch`.
   - Splits validation into parallel jobs: `lint`, `test`.
-  - Runs `publish` only on tag pushes (`v*`) and only after `lint` and `test` succeed.
-  - `publish` verifies tag/version match, publishes crates to crates.io, and publishes `.gtpack` bundles as OCI artifacts to GHCR.
+  - Runs `publish` only on pushes to `master`, and only after `lint` and `test` succeed.
+  - `publish` reads version from `Cargo.toml`, publishes crates to crates.io, and publishes `.gtpack` bundles as OCI artifacts to GHCR.
 
 ### How to cut a release
 
 1. Bump `version` in `Cargo.toml`.
-2. Commit and push to your main branch.
-3. Create and push a matching tag:
+2. Commit and push to `master`.
 
 ```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
+git push origin master
 ```
-
-The publish workflow fails if the tag does not match the crate version.
 
 ### Required repository secrets
 
