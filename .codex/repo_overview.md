@@ -80,19 +80,12 @@ The stack is Rust (edition 2024), shell scripts for local checks/build, and GitH
 - **Path:** `.github/workflows/ci.yml`
 - **Role:** Pull request and push validation pipeline.
 - **Key functionality:**
-  - Parallel jobs for linting, tests, and package/publish dry-run checks.
+  - Parallel jobs for linting and tests.
+  - Tag-gated publish job (`v*`) that runs after lint/test pass.
+  - Publish job verifies tag/version match, publishes crates, and pushes `.gtpack` artifacts to GHCR.
   - Uses Rust toolchain setup and Cargo caching.
 - **Key dependencies / integration points:**
   - Reuses local CI expectations from scripts under `ci/`.
-
-- **Path:** `.github/workflows/publish.yml`
-- **Role:** Release/publish automation.
-- **Key functionality:**
-  - Validates tag/version match (`v<version>` from `Cargo.toml`).
-  - Runs local checks before publish stages.
-  - Publishes crates (with retry) and optionally publishes `.gtpack` files to GHCR as OCI artifacts.
-- **Key dependencies / integration points:**
-  - Requires `CARGO_REGISTRY_TOKEN`; uses `GHCR_TOKEN` or `GITHUB_TOKEN`.
 
 ## 3. Work In Progress, TODOs, and Stubs
 - **Location:** `src/ingress_control.rs` (`ingress_control_handle`)

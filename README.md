@@ -71,16 +71,10 @@ cargo run --bin ingress_control_handle
 ### GitHub Actions
 
 - `.github/workflows/ci.yml`
-  - Runs on pull requests and pushes to `main`/`master`.
-  - Splits work into parallel jobs: `lint`, `test`, `package-dry-run`.
-  - Enforces deterministic package dry-runs and packaging asset checks.
-
-- `.github/workflows/publish.yml`
-  - Runs on `workflow_dispatch` and tag pushes `v*`.
-  - Verifies `GITHUB_REF_NAME` equals `v<version>` from `Cargo.toml`.
-  - Runs `ci/local_check.sh` in a `verify` stage.
-  - Publishes crates to crates.io after dry-run checks.
-  - Publishes `.gtpack` bundles as OCI artifacts to GHCR.
+  - Runs on pull requests, branch pushes (`main`/`master`), tag pushes (`v*`), and `workflow_dispatch`.
+  - Splits validation into parallel jobs: `lint`, `test`.
+  - Runs `publish` only on tag pushes (`v*`) and only after `lint` and `test` succeed.
+  - `publish` verifies tag/version match, publishes crates to crates.io, and publishes `.gtpack` bundles as OCI artifacts to GHCR.
 
 ### How to cut a release
 
