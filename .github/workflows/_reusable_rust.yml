@@ -1,0 +1,36 @@
+name: Reusable Rust Checks
+
+on:
+  workflow_call:
+    inputs:
+      run_fmt:
+        required: false
+        type: boolean
+        default: true
+      run_clippy:
+        required: false
+        type: boolean
+        default: true
+      run_test:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt
+        if: ${{ inputs.run_fmt }}
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        if: ${{ inputs.run_clippy }}
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: cargo test
+        if: ${{ inputs.run_test }}
+        run: cargo test --all-features

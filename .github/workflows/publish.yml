@@ -1,0 +1,133 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate tag matches Cargo.toml version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="$(awk -F '"' '/^version = "/ { print $2; exit }' Cargo.toml)"
+          if [ -z "$version" ]; then
+            echo "Failed to extract crate version from Cargo.toml" >&2
+            exit 1
+          fi
+          expected_tag="v${version}"
+          if [ "${tag}" != "${expected_tag}" ]; then
+            echo "Tag/version mismatch: got '${tag}', expected '${expected_tag}'" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Run local checks
+        run: bash ci/local_check.sh
+
+  publish-crates:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish crates.io packages
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          crates="$(bash ci/list_publishable_crates.sh)"
+          if [ -z "$crates" ]; then
+            echo "No publishable crates found."
+            exit 0
+          fi
+
+          for crate in $crates; do
+            echo "::group::${crate} dry-run"
+            cargo publish -p "$crate" --dry-run
+            echo "::endgroup::"
+          done
+
+          retry_publish() {
+            crate="$1"
+            attempt=1
+            max_attempts=3
+            while [ "$attempt" -le "$max_attempts" ]; do
+              if cargo publish -p "$crate" --locked; then
+                return 0
+              fi
+              if [ "$attempt" -eq "$max_attempts" ]; then
+                echo "cargo publish failed for '$crate' after ${max_attempts} attempts" >&2
+                return 1
+              fi
+              sleep_seconds=$((attempt * 20))
+              echo "Retry ${attempt}/${max_attempts} for '$crate' after ${sleep_seconds}s"
+              sleep "$sleep_seconds"
+              attempt=$((attempt + 1))
+            done
+          }
+
+          for crate in $crates; do
+            echo "::group::${crate} publish"
+            retry_publish "$crate"
+            echo "::endgroup::"
+            sleep 15
+          done
+
+  publish-ghcr-gtpacks:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ORAS
+        uses: oras-project/setup-oras@v1
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
+        run: echo "${GHCR_TOKEN}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Publish .gtpack files as OCI artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+          owner_lc="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          repo_name="$(basename "${GITHUB_REPOSITORY}")"
+
+          count=0
+          while IFS= read -r -d '' file; do
+            count=$((count + 1))
+            base="$(basename "$file" .gtpack)"
+            artifact_name="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '-')"
+            ref="ghcr.io/${owner_lc}/${repo_name}/${artifact_name}:v${version}"
+            echo "Publishing ${file} -> ${ref}"
+            oras push "$ref" \
+              "$file:application/vnd.greentic.gtpack.v1+binary"
+          done < <(find . -type f -name '*.gtpack' -print0)
+
+          if [ "$count" -eq 0 ]; then
+            echo "No .gtpack files found; skipping GHCR publish."
+          fi
