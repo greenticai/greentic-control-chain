@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "controller component configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "echo_prefix": {
+      "type": "string",
+      "description": "Prefix prepended to every handle response",
+      "default": "controller",
+      "x-default-applied": true
+    }
+  }
+}

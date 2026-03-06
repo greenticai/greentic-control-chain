@@ -1,124 +1,59 @@
-# PR-RTR-CHAIN-01: greentic-control-chain gtpack scaffold + hook offer (post_ingress control v1)
-Date: 2026-02-25
+# PR-RTR-CHAIN-01: Wizard-Managed Control Extension Pack (Capability-First)
+Date: 2026-03-06
 
 ## Scope
-Unified scope for former PR-01 + PR-02 in this repo:
-- Create missing gtpack scaffolding and packaging path.
-- Publish canonical hook offer in `pack.cbor`.
-- Provide invokable `ingress_control.handle` with Stage 0/1 routing behavior.
-- Keep implementation production-shaped: versioned directives, strict asset validation, policy guardrails.
+- Replace hand-rolled pack artifacts with wizard-managed `pack.yaml` + extension files.
+- Build `dist/routing-ingress-control-chain.gtpack` from wizard replay + materialization.
+- Keep capability-first control offer canonical (`greentic.ext.capabilities.v1`).
+- Provide a real invokable controller wasm and setup QA payload.
+- Add runtime/integration tests for component ops and setup path.
 
-## Canonical discovery contract
-Operator selection is canonical by:
-- `offer.kind == "hook"`
-- `offer.stage == "post_ingress"`
-- `offer.contract == "greentic.hook.control.v1"`
+## Current Canonical Contract
+Control capability is published in:
+- `pack/extensions/control.json`
+- `pack/pack.yaml` under `extensions.greentic.ext.capabilities.v1.inline`
 
-`meta.cap_id = "greentic.cap.ingress.control.v1"` is metadata only.
-Operator must never select by `cap_id`.
+Offer fields:
+- `cap_id: greentic.cap.ingress.control.v1`
+- `offer_id: control-chain.post-ingress`
+- `provider.component_ref: controller`
+- `provider.op: ingress_control.handle`
+- `requires_setup: true`
+- `setup.qa_ref: qa/control-setup.json`
+- `version: v1`
 
-## Pack scaffold
-Expected layout:
+## Build Flow
+`bash build/build_gtpack.sh` now does:
+1. `greentic-pack wizard apply --answers build/wizard/control-pack.answers.json`
+2. `bash build/materialize_control_placeholders.sh`
+3. `greentic-pack components --in ./pack` (deterministic component sync)
+4. `greentic-pack doctor --in ./pack`
+5. `greentic-pack build --in ./pack`
+6. copy `pack/dist/*.gtpack` to `dist/routing-ingress-control-chain.gtpack`
 
-```text
-pack/
-  pack.cbor
-  assets/
-    rules.cbor   (optional)
-    policy.cbor  (optional)
-```
+## Materialization Behavior
+- Component source scaffold is created with `greentic-component new` at:
+  - `component-src/controller`
+- Built wasm is copied into canonical pack component path:
+  - `pack/components/controller/component.wasm`
+- Setup QA is generated with `greentic-qa generate` into:
+  - `pack/qa/control-setup.json`
+- Legacy `pack/components/controller-src` is removed to avoid duplicate component discovery.
 
-Build output:
-- `.gtpack` zip that contains `pack.cbor` (+ optional CBOR assets when present).
+## Tests
+- Unit/runtime tests:
+  - `tests/ingress_control_runtime.rs`
+- CLI integration tests invoking built wasm via `greentic-component test`:
+  - `tests/controller_component_cli.rs`
+  - validates:
+    - `ingress_control.handle` refund dispatch
+    - invalid `explicit_path` fallback behavior
+    - extension setup wiring (`requires_setup` + `qa_ref`)
+    - `qa-spec` and `apply-answers` setup lifecycle behavior
 
-## `pack.cbor` offer (single functional offer)
-`offers[]` contains one hook offer:
-- `id: "control-chain.post-ingress"`
-- `kind: "hook"`
-- `stage: "post_ingress"`
-- `contract: "greentic.hook.control.v1"`
-- `priority: 10`
-- `provider.op: "ingress_control.handle"`
-- `meta.cap_id: "greentic.cap.ingress.control.v1"` (optional metadata)
-
-No second capability offer entry is emitted.
-
-## Runtime behavior in this unified PR
-- Runtime assets are CBOR-only (`rules.cbor`, `policy.cbor`) in production shape.
-- `policy.cbor` is optional; if missing:
-  - `allow_respond=false`
-  - `allow_llm=false`
-- `rules.cbor` is optional; if missing:
-  - Stage 1 is no-op and handler returns `continue`.
-- Stage 0 supports `explicit_path` and validates strict `pack[/flow[/node]]` grammar.
-  - Invalid `explicit_path` returns `continue` + diagnostics.
-- Stage 1 loads ordered rules and applies first-match semantics:
-  - `keyword` / `regex` matching
-  - `dispatch`, `respond`, `continue`, `deny` outcomes
-- Policy gating:
-  - `respond` action downgrades to `continue` when `allow_respond=false` with `diag.policy_blocked="respond"`.
-- Invalid assets fail visibly:
-  - invalid rules => `deny code=invalid_rules_asset`
-  - invalid policy => `deny code=invalid_policy_asset`
-
-## Schemas (v1)
-
-### `assets/rules.cbor`
-```cbor
-{
-  "v": 1,
-  "rules": [ RuleV1... ]
-}
-```
-
-### `assets/policy.cbor`
-```cbor
-{
-  "v": 1,
-  "allow_respond": bool,
-  "allow_llm": bool
-}
-```
-
-### `result_cbor` directive envelope
-```cbor
-{
-  "v": 1,
-  "action": "dispatch" | "respond" | "continue" | "deny",
-  "dispatch": { "pack":"...", "flow":"..."?, "node":"..."? }?,
-  "respond":  { "text":"...", "needs_user": bool }?,
-  "deny":     { "code":"...", "reason":"...", "details": map? }?,
-  "diag": {
-    "stage": 0 | 1,
-    "matched_rule_id": "..."?,
-    "explicit_path_valid": bool?,
-    "policy_blocked": "respond"?,
-    "allow_llm": bool?,
-    "errors": [ { "code":"...", "msg":"..." } ]?
-  }?
-}
-```
-
-## Implementation plan
-1. Add pack scaffold and build tooling to produce `.gtpack` zip with `pack.cbor`.
-2. Implement canonical single hook offer in `pack.cbor`.
-3. Implement Stage 0/1 `ingress_control.handle` runtime with CBOR policy/rules loading and validation.
-4. Add packaging test that builds zip, extracts `pack.cbor`, and asserts:
-   - `kind=hook`
-   - `stage=post_ingress`
-   - `contract=greentic.hook.control.v1`
-   - `provider.op=ingress_control.handle`
-5. Add runtime tests for explicit path validation, missing/invalid assets, deterministic rule ordering, and policy gating.
-6. Keep capability id metadata-only language in docs/spec; remove capability-based selection language.
-
-## Compatibility notes
-- Requires operator support for hook offers resolved by `(kind, stage, contract)`.
-- Works with operators implementing `greentic.hook.control.v1`.
-
-## Acceptance criteria
-- Pack scaffold exists and builds a `.gtpack` zip containing `pack.cbor`.
-- Hook offer is discoverable by operator using `(kind, stage, contract)`.
-- Handler is invokable and returns versioned CBOR directive envelopes.
-- Stage 0/1 behavior is covered by tests (including invalid asset and policy-gating cases).
-- Packaging test validates required hook-offer fields from `pack.cbor`.
-- `cap_id` remains metadata only and is not used for selection.
+## Acceptance Criteria
+- `dist/routing-ingress-control-chain.gtpack` is produced via wizard-first build path.
+- Pack publishes canonical capability offer for control (`greentic.ext.capabilities.v1`).
+- Controller wasm is real and invokable for `ingress_control.handle`.
+- Setup QA artifact exists and is referenced by offer setup metadata.
+- `cargo test --all-features` and `bash ci/local_check.sh` pass.

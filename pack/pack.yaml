@@ -1,0 +1,43 @@
+pack_id: routing.ingress.control.chain
+version: 0.1.0
+kind: application
+publisher: Greentic
+components:
+- id: controller
+  version: 0.1.0
+  world: greentic:provider/schema-core@1.0.0
+  supports: []
+  profiles:
+    default: stateless
+    supported:
+    - stateless
+  capabilities:
+    wasi:
+      random: false
+      clocks: false
+    host: {}
+  wasm: components/controller/component.wasm
+  operations:
+  - name: ingress_control.handle
+    input_schema: {}
+    output_schema: {}
+dependencies: []
+flows: []
+assets: []
+extensions:
+  greentic.ext.capabilities.v1:
+    kind: greentic.ext.capabilities.v1
+    version: 1.0.0
+    inline:
+      offers:
+      - cap_id: greentic.cap.ingress.control.v1
+        offer_id: control-chain.post-ingress
+        priority: 10
+        provider:
+          component_ref: controller
+          op: ingress_control.handle
+        requires_setup: true
+        setup:
+          qa_ref: qa/control-setup.json
+        version: v1
+      schema_version: 1

@@ -1,0 +1,43 @@
+{
+  "wizard_id": "greentic-pack.wizard.run",
+  "schema_id": "greentic-pack.wizard.answers",
+  "schema_version": "1.0.0",
+  "locale": "en-GB",
+  "answers": {
+    "dry_run": false,
+    "extension_catalog_ref": "file://../greentic-pack/docs/extensions_capability_packs.catalog.v1.json",
+    "extension_edit_answers": {
+      "cap_id": "greentic.cap.ingress.control.v1",
+      "component_ref": "controller",
+      "create_offer": "true",
+      "entry_label": "control",
+      "hook_op_names": "",
+      "offer_id": "control-chain.post-ingress",
+      "op": "ingress_control.handle",
+      "priority": "10",
+      "qa_ref": "qa/control-setup.json",
+      "requires_setup": "true",
+      "version": "v1"
+    },
+    "extension_operation": "create_extension_pack",
+    "extension_template_id": "control-basic",
+    "extension_template_qa_answers": {
+      "display_name": "Routing ingress control chain",
+      "pack_id": "routing.ingress.control.chain"
+    },
+    "extension_type_id": "control",
+    "mode": "interactive",
+    "pack_dir": "./pack",
+    "run_build": false,
+    "run_delegate_component": false,
+    "run_delegate_flow": false,
+    "run_doctor": false,
+    "selected_actions": [
+      "main.create_extension_pack",
+      "create_extension_pack.start",
+      "main.exit"
+    ],
+    "sign": false
+  },
+  "locks": {}
+}

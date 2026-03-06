@@ -1,0 +1,30 @@
+{
+  "dir_name": "control-setup",
+  "summary_md": "Generated control setup form for routing ingress control chain.",
+  "form": {
+    "id": "control-setup",
+    "title": "Control Setup",
+    "version": "0.1.0",
+    "description": "Initial setup form for control extension configuration."
+  },
+  "questions": [
+    {
+      "id": "policy_mode",
+      "type": "string",
+      "title": "Policy mode",
+      "required": true
+    },
+    {
+      "id": "allow_llm",
+      "type": "boolean",
+      "title": "Allow LLM directives",
+      "required": true
+    },
+    {
+      "id": "allow_respond",
+      "type": "boolean",
+      "title": "Allow direct respond actions",
+      "required": true
+    }
+  ]
+}

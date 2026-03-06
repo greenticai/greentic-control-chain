@@ -1,0 +1,43 @@
+{
+  "canonical_extension_key": "greentic.ext.capabilities.v1",
+  "capabilities_extension": {
+    "offers": [
+      {
+        "cap_id": "greentic.cap.ingress.control.v1",
+        "offer_id": "control-chain.post-ingress",
+        "priority": 10,
+        "provider": {
+          "component_ref": "controller",
+          "op": "ingress_control.handle"
+        },
+        "requires_setup": true,
+        "setup": {
+          "qa_ref": "qa/control-setup.json"
+        },
+        "version": "v1"
+      }
+    ],
+    "schema_version": 1
+  },
+  "catalog_ref": "file://../greentic-pack/docs/extensions_capability_packs.catalog.v1.json",
+  "edit_answers": {
+    "cap_id": "greentic.cap.ingress.control.v1",
+    "component_ref": "controller",
+    "create_offer": "true",
+    "entry_label": "control",
+    "hook_op_names": "",
+    "offer_id": "control-chain.post-ingress",
+    "op": "ingress_control.handle",
+    "priority": "10",
+    "qa_ref": "qa/control-setup.json",
+    "requires_setup": "true",
+    "version": "v1"
+  },
+  "extension_type": "control",
+  "operation": "create_extension_pack",
+  "template_id": "control-basic",
+  "template_qa_answers": {
+    "display_name": "Routing ingress control chain",
+    "pack_id": "routing.ingress.control.chain"
+  }
+}

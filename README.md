@@ -4,22 +4,29 @@
 
 ## Hook Pack Scaffold
 
-The repo includes minimal gtpack scaffolding under `pack/` and a builder:
+The repo uses wizard-managed pack sources under `pack/` and a builder:
 
 ```bash
 bash build/build_gtpack.sh
 ```
 
 This produces:
-- `build/dist/routing-ingress-control-chain.gtpack`
+- `dist/routing-ingress-control-chain.gtpack`
 
-The generated `pack.cbor` publishes a single canonical hook offer:
-- `kind=hook`
-- `stage=post_ingress`
-- `contract=greentic.hook.control.v1`
-- `provider.op=ingress_control.handle`
+The build flow is:
+1. `greentic-pack wizard apply --answers build/wizard/control-pack.answers.json`
+2. `bash build/materialize_control_placeholders.sh`
+3. `greentic-pack doctor --in ./pack`
+4. `greentic-pack build --in ./pack`
+5. copy generated `pack/dist/*.gtpack` to `dist/routing-ingress-control-chain.gtpack`
 
-`meta.cap_id=greentic.cap.ingress.control.v1` is metadata-only (cataloging); operator selection must use `(kind, stage, contract)`.
+`materialize_control_placeholders.sh` does two things:
+- scaffolds real component source with `greentic-component new` into `component-src/controller`
+- generates a real QA form with `greentic-qa generate` into `pack/qa/control-setup.json`
+
+Note: in offline environments, `greentic-component new` may fail its internal `cargo check`; the script keeps pack buildable and prints a warning.
+By default, packaging now requires a real controller wasm (`GREENTIC_REQUIRE_REAL_WASM=1`).
+Set `GREENTIC_REQUIRE_REAL_WASM=0` only if you intentionally want to allow placeholder wasm during local iteration.
 
 ### Runtime behavior (current)
 
@@ -53,6 +60,29 @@ This runs:
    - `cargo package -p <crate>`
    - `cargo publish -p <crate> --dry-run`
    - packaged asset verification
+7. Wizard dry-run smoke checks:
+   - `greentic-pack wizard run --dry-run --emit-answers ...`
+   - `greentic-component wizard --dry-run --plan-out ... --emit-answers ...`
+
+### Wizard-first workflow
+
+- Run wizard dry-run checks in a temporary directory:
+
+```bash
+bash build/wizard_dry_run_check.sh
+```
+
+- Scaffold a control extension pack via the wizard menu (`3 -> 8`):
+
+```bash
+bash build/wizard_create_control_pack.sh ./pack
+```
+
+- Scaffold a component via wizard defaults:
+
+```bash
+greentic-component wizard --emit-answers ./component.answers.json
+```
 
 ### Pack invoke/build helpers
 
@@ -61,6 +91,9 @@ This runs:
 ```bash
 bash build/build_gtpack.sh
 ```
+
+Artifact path:
+- `dist/routing-ingress-control-chain.gtpack`
 
 - Invoke minimal handler (reads CBOR map from stdin, writes CBOR directive to stdout):
 
@@ -89,3 +122,9 @@ git push origin master
 
 - `CARGO_REGISTRY_TOKEN` for crates.io publishing.
 - `GHCR_TOKEN` for GHCR publishing (optional if `GITHUB_TOKEN` has package write permission).
+
+## Wizard Binary
+
+Build scripts use `greentic-pack` from PATH by default.
+Override only when needed:
+- `GREENTIC_PACK_BIN=<path-to-greentic-pack>`
