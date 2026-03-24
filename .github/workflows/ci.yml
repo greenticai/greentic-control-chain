@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - main
-      - master
+      - main
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -36,7 +36,7 @@ jobs:
         run: cargo test --all-features
 
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [lint, test]
     runs-on: ubuntu-latest
     permissions:
