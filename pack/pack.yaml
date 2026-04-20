@@ -12,30 +12,32 @@ components:
     supported:
     - stateless
   capabilities:
-    wasi: {}
+    wasi:
+      random: false
+      clocks: false
     host: {}
   wasm: components/controller/component.wasm
   operations:
   - name: ingress_control.handle
     input_schema: {}
     output_schema: {}
-flows: []
 dependencies: []
+flows: []
 assets: []
 extensions:
   greentic.ext.capabilities.v1:
     kind: greentic.ext.capabilities.v1
     version: 1.0.0
     inline:
-      schema_version: 1
       offers:
-      - offer_id: control-chain.post-ingress
-        cap_id: greentic.cap.ingress.control.v1
-        version: v1
+      - cap_id: greentic.cap.ingress.control.v1
+        offer_id: control-chain.post-ingress
+        priority: 10
         provider:
           component_ref: controller
           op: ingress_control.handle
-        priority: 10
         requires_setup: true
         setup:
           qa_ref: qa/control-setup.json
+        version: v1
+      schema_version: 1

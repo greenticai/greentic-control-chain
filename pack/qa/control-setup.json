@@ -1,5 +1,49 @@
 {
-  "id": "control-chain.post-ingress-setup",
-  "version": "1.0.0",
-  "questions": []
+  "id": "control-setup",
+  "title": "Control Setup",
+  "version": "0.1.0",
+  "description": "Initial setup form for control extension configuration.",
+  "presentation": {
+    "intro": "Generated control setup form for routing ingress control chain."
+  },
+  "progress_policy": {
+    "skip_answered": true,
+    "autofill_defaults": false,
+    "treat_default_as_answered": false
+  },
+  "questions": [
+    {
+      "id": "policy_mode",
+      "type": "string",
+      "title": "Policy mode",
+      "required": true,
+      "secret": false,
+      "policy": {
+        "editable_if_from_default": false
+      },
+      "computed_overridable": false
+    },
+    {
+      "id": "allow_llm",
+      "type": "boolean",
+      "title": "Allow LLM directives",
+      "required": true,
+      "secret": false,
+      "policy": {
+        "editable_if_from_default": false
+      },
+      "computed_overridable": false
+    },
+    {
+      "id": "allow_respond",
+      "type": "boolean",
+      "title": "Allow direct respond actions",
+      "required": true,
+      "secret": false,
+      "policy": {
+        "editable_if_from_default": false
+      },
+      "computed_overridable": false
+    }
+  ]
 }
