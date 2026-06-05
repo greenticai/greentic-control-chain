@@ -258,6 +258,183 @@ fn valid_explicit_path_dispatches() {
     assert_eq!(dispatch.flow.as_deref(), Some("flow_refund"));
 }
 
+#[test]
+fn respond_rule_is_allowed_when_policy_permits() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(
+        &assets,
+        vec![RuleInput::respond_rule(
+            "r1",
+            "refund",
+            "How can I help with your refund?",
+            true,
+        )],
+    );
+
+    let inbound = inbound_with_text("i need a refund");
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Respond);
+    let respond = directive.respond.expect("respond payload");
+    assert_eq!(respond.text, "How can I help with your refund?");
+    assert!(respond.needs_user);
+    let diag = directive.diag.expect("diag");
+    assert_eq!(diag.matched_rule_id.as_deref(), Some("r1"));
+    assert!(diag.policy_blocked.is_none());
+}
+
+#[test]
+fn matching_deny_rule_returns_rule_defined_deny() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(&assets, vec![RuleInput::deny_rule("blocklist", "wire money")]);
+
+    let inbound = inbound_with_text("please wire money now");
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Deny);
+    let deny = directive.deny.expect("deny payload");
+    assert_eq!(deny.code, "blocked_intent");
+    assert_eq!(deny.reason, "request matched a blocklist rule");
+    let diag = directive.diag.expect("diag");
+    assert_eq!(diag.matched_rule_id.as_deref(), Some("blocklist"));
+}
+
+#[test]
+fn matching_continue_rule_continues_with_matched_rule_id() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(&assets, vec![RuleInput::continue_rule("passthrough", "hello")]);
+
+    let inbound = inbound_with_text("hello there");
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Continue);
+    let diag = directive.diag.expect("diag");
+    assert_eq!(diag.stage, 1);
+    assert_eq!(diag.matched_rule_id.as_deref(), Some("passthrough"));
+}
+
+#[test]
+fn no_rule_match_continues_without_matched_rule_id() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(
+        &assets,
+        vec![RuleInput::dispatch_rule(
+            "r1",
+            "refund",
+            "commerce-support/flow_refund",
+        )],
+    );
+
+    let inbound = inbound_with_text("just saying hi");
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Continue);
+    let diag = directive.diag.expect("diag");
+    assert!(diag.matched_rule_id.is_none());
+}
+
+#[test]
+fn regex_rule_matches_and_dispatches() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(
+        &assets,
+        vec![RuleInput::regex_dispatch_rule(
+            "r-regex",
+            r"refund|reimburse",
+            "commerce-support/flow_refund",
+        )],
+    );
+
+    let inbound = inbound_with_text("can i get a reimburse");
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Dispatch);
+    let dispatch = directive.dispatch.expect("dispatch payload");
+    assert_eq!(dispatch.pack, "commerce-support");
+    let diag = directive.diag.expect("diag");
+    assert_eq!(diag.matched_rule_id.as_deref(), Some("r-regex"));
+}
+
+#[test]
+fn keyword_matching_is_case_insensitive_by_default() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(
+        &assets,
+        vec![RuleInput::dispatch_rule(
+            "r1",
+            "refund",
+            "commerce-support/flow_refund",
+        )],
+    );
+
+    let inbound = inbound_with_text("REFUND PLEASE");
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Dispatch);
+}
+
+#[test]
+fn message_without_text_continues_before_rule_evaluation() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    // A matching rule exists, but with no message text we should bail out early.
+    write_rules(&assets, vec![RuleInput::deny_rule("blocklist", "refund")]);
+
+    let inbound = BTreeMap::new();
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Continue);
+    let diag = directive.diag.expect("diag");
+    assert!(diag.matched_rule_id.is_none());
+}
+
+#[test]
+fn policy_allow_llm_is_reflected_in_diag() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, true);
+
+    let inbound = inbound_with_text("anything");
+    let directive = handle_with_assets(&inbound, &assets);
+    let diag = directive.diag.expect("diag");
+    assert!(diag.allow_llm);
+}
+
+#[test]
+fn explicit_path_takes_precedence_over_matching_rules() {
+    let temp = unique_tempdir("ingress_test");
+    let assets = temp.join("assets");
+    fs::create_dir_all(&assets).expect("create assets dir");
+    write_policy(&assets, true, false);
+    write_rules(&assets, vec![RuleInput::deny_rule("blocklist", "refund")]);
+
+    let mut inbound = inbound_with_text("refund please");
+    inbound.insert(
+        "explicit_path".to_string(),
+        Value::Text("commerce-support/flow_refund".to_string()),
+    );
+
+    let directive = handle_with_assets(&inbound, &assets);
+    assert_eq!(directive.action, Action::Dispatch);
+    let diag = directive.diag.expect("diag");
+    assert_eq!(diag.explicit_path_valid, Some(true));
+    assert!(diag.matched_rule_id.is_none());
+}
+
 #[derive(Serialize)]
 struct PolicyV1 {
     v: u8,
@@ -333,6 +510,64 @@ impl RuleInput {
                 target: None,
                 text: Some(text.to_string()),
                 needs_user: Some(needs_user),
+                deny: None,
+            },
+        }
+    }
+
+    fn continue_rule(id: &str, keyword: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            when: RuleWhenInput {
+                keyword: Some(keyword.to_string()),
+                regex: None,
+                case_sensitive: None,
+            },
+            then: RuleThenInput {
+                action: "continue".to_string(),
+                target: None,
+                text: None,
+                needs_user: None,
+                deny: None,
+            },
+        }
+    }
+
+    fn deny_rule(id: &str, keyword: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            when: RuleWhenInput {
+                keyword: Some(keyword.to_string()),
+                regex: None,
+                case_sensitive: None,
+            },
+            then: RuleThenInput {
+                action: "deny".to_string(),
+                target: None,
+                text: None,
+                needs_user: None,
+                deny: Some(RuleDenyInput {
+                    code: "blocked_intent".to_string(),
+                    reason: "request matched a blocklist rule".to_string(),
+                    details: None,
+                }),
+            },
+        }
+    }
+
+    fn regex_dispatch_rule(id: &str, regex: &str, target: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            when: RuleWhenInput {
+                keyword: None,
+                regex: Some(regex.to_string()),
+                case_sensitive: None,
+            },
+            then: RuleThenInput {
+                action: "dispatch".to_string(),
+                target: Some(target.to_string()),
+                text: None,
+                needs_user: None,
                 deny: None,
             },
         }
