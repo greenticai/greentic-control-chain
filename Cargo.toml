@@ -1,13 +1,19 @@
 [package]
 name = "greentic-control-chain"
-version = "0.5.0"
+version = "1.1.0"
 edition = "2024"
 description = "Control-chain service and tooling for Greentic workflows."
 license = "MIT"
 repository = "https://github.com/greentic-ai/greentic-control-chain"
 readme = "README.md"
-keywords = ["greentic", "control-chain", "workflow"]
-categories = ["command-line-utilities"]
+keywords = [
+    "greentic",
+    "control-chain",
+    "workflow",
+]
+categories = [
+    "command-line-utilities",
+]
 include = [
     "src/**",
     "pack/**",
@@ -20,9 +26,14 @@ include = [
 ]
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
 serde_cbor = "0.11"
 regex = "1"
+
+[dependencies.serde]
+version = "1"
+features = [
+    "derive",
+]
 
 [dev-dependencies]
 serde_json = "1"
