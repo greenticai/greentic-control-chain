@@ -33,20 +33,20 @@ features = [
 ]
 
 [dependencies.greentic-interfaces-guest]
-version = ">=1.1.0-dev, <1.2.0-0"
+version = ">=1.1.0-0, <1.2.0-0"
 default-features = false
 features = [
     "component-v0-6",
 ]
 
 [dependencies.greentic-types]
-version = ">=1.1.0-dev, <1.2.0-0"
+version = ">=1.1.0-0, <1.2.0-0"
 
 [build-dependencies]
 serde_json = "1"
 
 [build-dependencies.greentic-types]
-version = ">=1.1.0-dev, <1.2.0-0"
+version = ">=1.1.0-0, <1.2.0-0"
 
 [dev-dependencies]
 serde_json = "1"
